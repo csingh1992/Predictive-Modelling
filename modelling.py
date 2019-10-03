@@ -15,6 +15,15 @@ import random
 import warnings
 import pandas as pd
 import numpy as np
+import collections 
+
+print "Executed Some Steps for Pandas Options"
+
+pd.set_option('display.max_columns',200)
+pd.set_option('display.max_rows',1000)
+pd.set_option('max_colwidth', -1)
+
+warnings.filterwarnings('ignore')
 
 print "Running on Python 2"
 
@@ -30,6 +39,8 @@ def edd_full(df):
     for var in df.columns:
         print "Running for :",var
         edd_full = pd.concat([edd_full,edd(df,var)],axis=0)
+        
+    edd_full.reset_index(drop=True,inplace=True) ##RETURNS ORDERED VALUES
     return(edd_full)
 
 def edd(df,var):
@@ -90,33 +101,37 @@ def edd(df,var):
         bot2_p90        = df[var].quantile(0.90)
         bot1_p99        = df[var].quantile(0.99)
     
-    """Combining Everything Together"""
-    frame_dict = {
-            'variable'     : var,
-            'data_type'    : var_data_type, 
-            'min_len'      : min_var_length,
-            'max_len'      : max_var_length,
-            'total'        : data_length,
-            'count'        : var_count,
-            'missing'      : missing_count,
-            'missing_rate' : missing_rate,
-            'distinct'     : distinct_values,
-            'mode'         : modal_value,
-            'modal_freq'   : modal_freq,
-            'modal_pct'    : modal_pct,
-            'min'          : min_value,
-            'max'          : max_value,
-            'mean'         : max_value,
-            'median'       : median_p50,
-            'top1_p01'     : top1_p01,
-            'top2_p05'     : top2_p05,
-            'top3_p25'     : top3_p25,
-            'bot3_p75'     : bot3_p75,
-            'bot2_p90'     : bot2_p90,
-            'bot1_p99'     : bot1_p99
-        }
-    single_frame = pd.DataFrame(frame_dict,index=[0])
-    return(single_frame[list(frame_dict.keys())])
+    
+    frame = collections.OrderedDict()
+
+    """Combining Everything Together within Ordered Dictionary"""
+    
+    frame['variable']     = var
+    frame['data_type']    = var_data_type 
+    frame['min_len']      = min_var_length
+    frame['max_len']      = max_var_length
+    frame['total']        = data_length
+    frame['count']        = var_count
+    frame['missing']      = missing_count
+    frame['missing_rate'] = missing_rate
+    frame['distinct']     = distinct_values
+    frame['mode']         = modal_value
+    frame['modal_freq']   = modal_freq
+    frame['modal_pct']    = modal_pct
+    frame['min']          = min_value
+    frame['max']          = max_value
+    frame['mean']         = max_value
+    frame['median']       = median_p50
+    frame['top1_p01']     = top1_p01
+    frame['top2_p05']     = top2_p05
+    frame['top3_p25']     = top3_p25
+    frame['bot3_p75']     = bot3_p75
+    frame['bot2_p90']     = bot2_p90
+    frame['bot1_p99']     = bot1_p99
+    
+    single_frame = pd.DataFrame(frame,index=[0]) ##USING ORDERED DICTIONARY ALLOWS ORDERED COLUMNS IN EDD
+    
+    return(single_frame)
 
 
 ##FUNCTION TO HANDLE NULL VALUE
@@ -227,3 +242,17 @@ def information_value(var_df):
     var_df['g_b']            = var_df['pct_events']-var_df['pct_non_events']
     var_df['woe']            = var_df['g_b']*var_df['log_g_b']
     return(var_df['woe'].sum())
+
+def full_iv(df,dv):
+    """
+    Runs full IV on the DataFrame using Dependant Variable Provided
+    """
+    for var in df.columns:
+        if var==dv:
+            continue
+        check['var'].append(var)
+        check['iv'].append(information_value(bivariate(df,var,dv)))
+    final = pd.DataFrame(check,index=np.arange(len(main.columns)-1))
+    final.sort_values(by=['iv'],ascending=False,inplace=True)
+    final.reset_index(inplace=True,drop=True)
+    return(final)
