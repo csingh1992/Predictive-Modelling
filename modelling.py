@@ -1,13 +1,122 @@
-
 """
+MODELLING.py
+
+AUTHOR: CHETAN CHAUHAN
+VERSION: 01
 
 This module consists of all the functions which are used for performing basic data exploration, variable importance 
 and for variable transformation to be finally used for modelling
 
 """
 
+import os
+import math  #For Checking Float
+import random
+import warnings
 import pandas as pd
 import numpy as np
+
+print "Running on Python 2"
+
+warnings.filterwarnings('ignore')
+
+
+def edd_full(df):
+    """Runs Full EDD for all Variables in DF"""
+    
+    edd_full = pd.DataFrame()
+    print "Total Data Size : ",len(df)," Rows & ",len(df.columns)," Columns"
+    
+    for var in df.columns:
+        print "Running for :",var
+        edd_full = pd.concat([edd_full,edd(df,var)],axis=0)
+    return(edd_full)
+
+def edd(df,var):
+    """Function to generate a comprehensive EDD for any given variable"""
+    
+    """Basic Data Indicators"""
+    var_data_type   = str(df[var].dtypes)
+    min_var_length  = df[var].apply(lambda x: 0 if x!=x else len(str(x))).min()
+    max_var_length  = df[var].apply(lambda x: 0 if x!=x else len(str(x))).max()
+    data_length     = len(df)
+    var_count       = df[var].count()
+    missing_count   = data_length-var_count
+    distinct_values = df[var].dropna().nunique()  #Should now be able to handle missing values
+    missing_rate    = np.round(float(missing_count)/float(data_length),2)
+    
+    """Modal Value %age"""
+    modal_value = df[var].value_counts().index[0]
+    modal_freq  = df[var].value_counts().head(1).tolist()[0]
+    modal_pct   = np.round(float(modal_freq)/float(data_length),2)
+    
+    """Freq Estimator"""
+    """Calculating Basic Statistics for each variable (basis its variable type)"""
+    if var_data_type in ('object'):
+        """Check"""
+        min_value    = '--'
+        max_value    = '--'
+        mean_value   = '--'
+        median_p50   = '--'
+        """Object Module"""
+        
+        vc = df[var].value_counts()
+        
+        if distinct_values == 1:
+            top2_p05=top3_p25=bot3_p75=bot2_p90='--'
+            bot1_p99=top1_p01=str(vc.index[0])+'|'+str(vc.tolist()[0])+'|'+str(np.round(float(vc.tolist()[0])/float(var_count)*100,2))+'%' 
+            
+        elif distinct_values == 2:            
+            top3_p25=bot3_p75='--'
+            bot2_p90=top1_p01=str(vc.index[0])+'|'+str(vc.tolist()[0])+'|'+str(np.round(float(vc.tolist()[0]) /float(var_count)*100,2))+'%'
+            bot1_p99=top2_p05=str(vc.index[1])+'|'+str(vc.tolist()[1])+'|'+str(np.round(float(vc.tolist()[1]) /float(var_count)*100,2))+'%' 
+        else:
+            top1_p01     = str(vc.index[0])+'|'+str(vc.tolist()[0]) +'|'+str(np.round(float(vc.tolist()[0]) /float(var_count)*100,2))+'%'
+            top2_p05     = str(vc.index[1])+'|'+str(vc.tolist()[1]) +'|'+str(np.round(float(vc.tolist()[1])
+/float(var_count)*100,2))+'%'
+            top3_p25     = str(vc.index[2])+'|'+str(vc.tolist()[2]) +'|'+str(np.round(float(vc.tolist()[2]) /float(var_count)*100,2))+'%'
+            bot3_p75     = str(vc.index[-3])+'|'+str(vc.tolist()[-3])+'|'+str(np.round(float(vc.tolist()[-3]) /float(var_count)*100,2))+'%'  
+            bot2_p90     = str(vc.index[-2])+'|'+str(vc.tolist()[-2])+'|'+str(np.round(float(vc.tolist()[-2]) /float(var_count)*100,2))+'%'
+            bot1_p99     = str(vc.index[-1])+'|'+str(vc.tolist()[-1])+'|'+str(np.round(float(vc.tolist()[-1]) /float(var_count)*100,2))+'%'
+    else:
+        min_value       = df[var].min()
+        max_value       = df[var].max()
+        mean_value      = df[var].mean()
+        median_p50      = df[var].median()
+        top1_p01        = df[var].quantile(0.01)
+        top2_p05        = df[var].quantile(0.05)
+        top3_p25        = df[var].quantile(0.25)
+        bot3_p75        = df[var].quantile(0.75)
+        bot2_p90        = df[var].quantile(0.90)
+        bot1_p99        = df[var].quantile(0.99)
+    
+    """Combining Everything Together"""
+    frame_dict = {
+            'variable'     : var,
+            'data_type'    : var_data_type, 
+            'min_len'      : min_var_length,
+            'max_len'      : max_var_length,
+            'total'        : data_length,
+            'count'        : var_count,
+            'missing'      : missing_count,
+            'missing_rate' : missing_rate,
+            'distinct'     : distinct_values,
+            'mode'         : modal_value,
+            'modal_freq'   : modal_freq,
+            'modal_pct'    : modal_pct,
+            'min'          : min_value,
+            'max'          : max_value,
+            'mean'         : max_value,
+            'median'       : median_p50,
+            'top1_p01'     : top1_p01,
+            'top2_p05'     : top2_p05,
+            'top3_p25'     : top3_p25,
+            'bot3_p75'     : bot3_p75,
+            'bot2_p90'     : bot2_p90,
+            'bot1_p99'     : bot1_p99
+        }
+    single_frame = pd.DataFrame(frame_dict,index=[0])
+    return(single_frame[list(frame_dict.keys())])
 
 
 ##FUNCTION TO HANDLE NULL VALUE
@@ -25,6 +134,7 @@ def null_handler(df,var,dv):
         null_df = null_df[['variable','category','nobs','events','non_events']]
         return(null_df)
 
+##GROUPBY IMPLEMENTATION FUNCTION
 def group_by_var(df,var,dv):
     """
     Returns Dataframe with Events grouped by input Variable
@@ -34,7 +144,7 @@ def group_by_var(df,var,dv):
     """
     ##TO CREATE NEW CATEGORY NAMES FOR BINNED VARIABLES
     if 'qcut' in var.split('_'):
-        mod_var = var.split('_')[1]
+        mod_var = var.split('qcut_')[1]          ##to handle variable names with underscore
         test    = df[~df[mod_var].isnull()].groupby([var]).agg({dv:['sum','count'],
                                                            mod_var:['min','max']}).reset_index()
         test.columns=test.columns.droplevel()
@@ -65,7 +175,7 @@ def group_by_var(df,var,dv):
         check.reset_index(drop=True,inplace=True)
         return(check)
     
-    
+##PRODUCES BIVARIATE FOR VARIABLES  
 def bivariate(main,var,dv):
     """
     Returns Bivariate Dataframe with Events grouped by input Variable
@@ -73,10 +183,11 @@ def bivariate(main,var,dv):
        var : Variable to be Grouped
        dv  : Dependant Variable
     """
-    df = main.copy()
+    df = main[[var,dv]].copy()  ##SMALLER COPIES MORE OPTIMAL
+    
     ##CHECKING FOR CORRECT DATA TYPES
-    if str(df[var].dtype) not in ['object' ,'int32','int64','int16','float32','float16','float64']:
-        return(0)
+    if str(df[var].dtype) not in ['object','int16','int32','int64','float16','float32','float64']:
+        return(pd.DataFrame()) #RETURNS EMPTY DATAFRAME FOR FULL RUN
     else:
         ##CATEGORICAL TREATMENT
         if (str(df[var].dtype)=='object') or (df[var].nunique()<=15) :
@@ -94,16 +205,24 @@ def bivariate(main,var,dv):
                     check.append(random.random())
                 null_col = pd.DataFrame(check,columns=['rand'])
                 df = pd.concat([df,null_col],axis=1)
-                df.sort_values(by='rand',ascending=True).reset_index(drop=True,inplace=True)
+                df.sort_values(by='rand',ascending=True,inplace=True)
+                df.reset_index(drop=True,inplace=True)
                 df['qcut_'+var] = pd.qcut(df[var].rank(method='first'),10,labels=['BIN'+str(i) for i in range(10)])
                 return(group_by_var(df,'qcut_'+var,dv))
-
+            
+##GIVES INFORMATION VALUE FOR SINGLE VARIABLE
 def information_value(var_df):
     """Returns Information Value of the Variable whose binning has been performed
        var_df  : Input Dataframe of Variable
     """
-    var_df['pct_events']     = var_df['events']/var_df['events'].sum()
-    var_df['pct_non_events'] = var_df['non_events']/var_df['non_events'].sum()
+    
+    ##ADJUSTING FOR 0 EVENTS OR NON EVENTS
+    var_df['adj_events']     = var_df.apply(lambda x: x['events']+0.5 if (x['events']==0 or x['non_events']==0) else x['events'],axis=1)
+    var_df['adj_non_events'] = var_df.apply(lambda x: x['non_events']+0.5 if (x['events']==0 or x['non_events']==0) else x['non_events'],axis=1)
+    
+    ##USUAL IV CALCULATIONs
+    var_df['pct_events']     = var_df['adj_events']    /var_df['adj_events'].sum()
+    var_df['pct_non_events'] = var_df['adj_non_events']/var_df['adj_non_events'].sum()
     var_df['log_g_b']        = np.log(var_df['pct_events']/var_df['pct_non_events'])
     var_df['g_b']            = var_df['pct_events']-var_df['pct_non_events']
     var_df['woe']            = var_df['g_b']*var_df['log_g_b']
