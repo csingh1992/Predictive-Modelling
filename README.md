@@ -1,2 +1,2 @@
 # Modules
- Modules for Autogenerating Modelling Exercises
+Python Modules for Automating Model Building and Data Exploration
