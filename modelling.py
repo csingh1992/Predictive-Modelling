@@ -7,17 +7,24 @@ VERSION: 01
 This module consists of all the functions which are used for performing basic data exploration, variable importance 
 and for variable transformation to be finally used for modelling
 
+Check for the classification item
+
+
 """
 
+from __future__ import print_function
+
 import os
-import math  #For Checking Float
+import math  
 import random
+import time
 import warnings
 import pandas as pd
 import numpy as np
-import collections 
+import collections
 
-print "Executed Some Steps for Pandas Options"
+from ipywidgets import IntProgress
+from IPython.display import display
 
 pd.set_option('display.max_columns',200)
 pd.set_option('display.max_rows',1000)
@@ -25,20 +32,43 @@ pd.set_option('max_colwidth', -1)
 
 warnings.filterwarnings('ignore')
 
-print "Running on Python 2"
+print("Running on Python 2")
+print("Pandas Set Options Modified")
 
-warnings.filterwarnings('ignore')
 
+def progress_bar(**kwargs):
+    """
+    Function is designed with two KWARGS:
+    
+    First Run --> Initialize Floater
+    NULL=<num_vars> : This would be the initialization of the Floater Object
+    
+    Second Run --> Recursively Pass Floater to generate value
+    ORIGIN=k            : This would pass an already created floater   
+    """
+    key = kwargs.items()
+    
+    if key[0][0]=='NULL':
+        f = IntProgress(min=0,max=key[0][1]) 
+        f.value=0
+        #f.description='Completed '+str(f.value)+'%'
+        display(f)
+        return(f)
+    else:
+        f=key[0][1] #FLOATER OBJECT
+        f.value+=1  #INCREMENT VALUE BY ONE
+        f.description=str(int(float(f.value)/float(f.max)*100))+'% Done'
+        return(f)
 
 def edd_full(df):
     """Runs Full EDD for all Variables in DF"""
     
     edd_full = pd.DataFrame()
-    print "Total Data Size : ",len(df)," Rows & ",len(df.columns)," Columns"
+    check=progress_bar(NULL=len(df.columns))  ##RUNS PROGRESS  BAR
     
     for var in df.columns:
-        print "Running for :",var
         edd_full = pd.concat([edd_full,edd(df,var)],axis=0)
+        check=progress_bar(ORIGIN=check)
         
     edd_full.reset_index(drop=True,inplace=True) ##RETURNS ORDERED VALUES
     return(edd_full)
@@ -245,14 +275,22 @@ def information_value(var_df):
 
 def full_iv(df,dv):
     """
-    Runs full IV on the DataFrame using Dependant Variable Provided
+    Runs full IV on the DataFrame using Dependant Variables Provided
     """
+    f=progress_bar(NULL=len(df.columns)-1)  ##INITIALIZED PROGRESS BAR
+    check = {
+        'var':[],
+        'iv':[]
+    }
     for var in df.columns:
         if var==dv:
             continue
         check['var'].append(var)
         check['iv'].append(information_value(bivariate(df,var,dv)))
-    final = pd.DataFrame(check,index=np.arange(len(main.columns)-1))
+        
+        f=progress_bar(ORIGIN=f)  ##PROGRESS BAR
+    
+    final = pd.DataFrame(check,index=np.arange(len(df.columns)-1))
     final.sort_values(by=['iv'],ascending=False,inplace=True)
     final.reset_index(inplace=True,drop=True)
     return(final)
