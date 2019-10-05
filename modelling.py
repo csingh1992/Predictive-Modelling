@@ -4,7 +4,7 @@ MODELLING.py
 AUTHOR: CHETAN CHAUHAN
 VERSION: 01
 
-This module consists of all the functions which are used for performing basic data exploration, variable importance
+This module consists of all the functions which are used for performing basic data exploration, variable importance 
 and for variable transformation to be finally used for modelling
 
 Check for the classification item
@@ -13,10 +13,8 @@ Check for the classification item
 """
 from __future__ import print_function
 
-from __future__ import print_function
-
 import os
-import math
+import math  
 import random
 import time
 import warnings
@@ -37,24 +35,21 @@ warnings.filterwarnings('ignore')
 print("Running on Python 2")
 print("Pandas Set Options Modified")
 
-
 ##*******************************************UTILITY: PROGRESS BAR************************************##
-
-
 def progress_bar(**kwargs):
     """
     Function is designed with two KWARGS:
-
+    
     First Run --> Initialize Floater
     NULL=<num_vars> : This would be the initialization of the Floater Object
-
+    
     Second Run --> Recursively Pass Floater to generate value
-    ORIGIN=k            : This would pass an already created floater
+    ORIGIN=k            : This would pass an already created floater   
     """
     key = kwargs.items()
-
+    
     if key[0][0]=='NULL':
-        f = IntProgress(min=0,max=key[0][1])
+        f = IntProgress(min=0,max=key[0][1]) 
         f.value=0
         #f.description='Completed '+str(f.value)+'%'
         display(f)
@@ -72,8 +67,8 @@ def full_data_run(**kwargs):
     c) dframe   : Name of DataFrame
     d) func     : Name of the function to be scaled
     e) dv       : Dependant Variable
-
-    Usage Example:
+    
+    Usage Example: 
     full_data_run(run_list   = main.columns,
                   skip_list = ['BAD'],
                   dframe    = main,
@@ -86,38 +81,31 @@ def full_data_run(**kwargs):
     dframe    = kwargs['dframe']
     func      = kwargs['func']
     dv        = kwargs['dv']
-
+    
     ##DECLARING EMPTY DATAFRAME
     full_run = pd.DataFrame()
-
-
+    
     ##INITIALIZE PROGRESS BAR
-    check=progress_bar(NULL=(len(run_list)-len(skip_list)))
-
+    check=progress_bar(NULL=(len(run_list)-len(skip_list)))   
+    
     ##LOOP FOR ALL FUNCTIONS ACROSS DATAFRAME
     for var in run_list:
         if var in skip_list:
             continue
         full_run = pd.concat([full_run,func(dframe,var,dv=dv)],axis=0)
         ##KWARGS NEEDS KEY VALUE PAIRS ELSE IT THROWS AN ERROR
-
-    edd_full = pd.DataFrame()
-    check=progress_bar(NULL=len(df.columns))  ##RUNS PROGRESS  BAR
-
-    for var in df.columns:
-        edd_full = pd.concat([edd_full,edd(df,var)],axis=0)
         check=progress_bar(ORIGIN=check)
-
+        
     full_run.reset_index(drop=True,inplace=True) ##RETURNS ORDERED VALUES
-    return(full_run)
+    return(full_run)    
 
 
 ##*******************************************EXPLORATORY DATA DICTIONARY************************************##
 def edd(df,var,**kwargs):
     """Function to generate a comprehensive EDD for any given variable"""
-
+    
     """Basic Data Indicators"""
-
+    
     var_data_type   = str(df[var].dtypes)
     min_var_length  = df[var].apply(lambda x: 0 if x!=x else len(str(x))).min()
     max_var_length  = df[var].apply(lambda x: 0 if x!=x else len(str(x))).max()
@@ -126,12 +114,12 @@ def edd(df,var,**kwargs):
     missing_count   = data_length-var_count
     distinct_values = df[var].dropna().nunique()  #Should now be able to handle missing values
     missing_rate    = np.round(float(missing_count)/float(data_length),2)
-
+    
     """Modal Value %age"""
     modal_value = df[var].value_counts().index[0]
     modal_freq  = df[var].value_counts().head(1).tolist()[0]
     modal_pct   = np.round(float(modal_freq)/float(data_length),2)
-
+    
     """Freq Estimator"""
     """Calculating Basic Statistics for each variable (basis its variable type)"""
     if var_data_type in ('object'):
@@ -141,24 +129,24 @@ def edd(df,var,**kwargs):
         mean_value   = '--'
         median_p50   = '--'
         """Object Module"""
-
+        
         vc  = df[var].value_counts()
         vci = vc.index
         vcl = vc.tolist()
-
+        
         if distinct_values == 1:
             top2_p05=top3_p25=bot3_p75=bot2_p90='--'
-            bot1_p99=top1_p01=str(vci[0])+'|'+str(vcl[0])+'|'+str(np.round(float(vcl[0])/float(var_count)*100,2))+'%'
-
-        elif distinct_values == 2:
+            bot1_p99=top1_p01=str(vci[0])+'|'+str(vcl[0])+'|'+str(np.round(float(vcl[0])/float(var_count)*100,2))+'%' 
+            
+        elif distinct_values == 2:            
             top3_p25=bot3_p75='--'
             bot2_p90=top1_p01=str(vci[0])+'|'+str(vcl[0])+'|'+str(np.round(float(vcl[0]) /float(var_count)*100,2))+'%'
-            bot1_p99=top2_p05=str(vci[1])+'|'+str(vcl[1])+'|'+str(np.round(float(vcl[1]) /float(var_count)*100,2))+'%'
+            bot1_p99=top2_p05=str(vci[1])+'|'+str(vcl[1])+'|'+str(np.round(float(vcl[1]) /float(var_count)*100,2))+'%' 
         else:
             top1_p01     = str(vci[0] )+'|'+str(vcl[0] )+'|'+str(np.round(float(vcl[0] ) /float(var_count)*100,2))+'%'
             top2_p05     = str(vci[1] )+'|'+str(vcl[1] )+'|'+str(np.round(float(vcl[1] ) /float(var_count)*100,2))+'%'
             top3_p25     = str(vci[2] )+'|'+str(vcl[2] )+'|'+str(np.round(float(vcl[2] ) /float(var_count)*100,2))+'%'
-            bot3_p75     = str(vci[-3])+'|'+str(vcl[-3])+'|'+str(np.round(float(vcl[-3]) /float(var_count)*100,2))+'%'
+            bot3_p75     = str(vci[-3])+'|'+str(vcl[-3])+'|'+str(np.round(float(vcl[-3]) /float(var_count)*100,2))+'%'  
             bot2_p90     = str(vci[-2])+'|'+str(vcl[-2])+'|'+str(np.round(float(vcl[-2]) /float(var_count)*100,2))+'%'
             bot1_p99     = str(vci[-1])+'|'+str(vcl[-1])+'|'+str(np.round(float(vcl[-1]) /float(var_count)*100,2))+'%'
     else:
@@ -172,14 +160,14 @@ def edd(df,var,**kwargs):
         bot3_p75        = df[var].quantile(0.75)
         bot2_p90        = df[var].quantile(0.90)
         bot1_p99        = df[var].quantile(0.99)
-
-
+    
+    
     frame = collections.OrderedDict()
 
     """Combining Everything Together within Ordered Dictionary"""
-
+    
     frame['variable']     = var
-    frame['data_type']    = var_data_type
+    frame['data_type']    = var_data_type 
     frame['min_len']      = min_var_length
     frame['max_len']      = max_var_length
     frame['total']        = data_length
@@ -200,9 +188,9 @@ def edd(df,var,**kwargs):
     frame['bot3_p75']     = bot3_p75
     frame['bot2_p90']     = bot2_p90
     frame['bot1_p99']     = bot1_p99
-
+    
     single_frame = pd.DataFrame(frame,index=[0]) ##USING ORDERED DICTIONARY ALLOWS ORDERED COLUMNS IN EDD
-
+    
     return(single_frame)
 
 
@@ -221,7 +209,7 @@ def null_handler(df,var,dv):
         null_df = null_df[['variable','category','nobs','events','non_events']]
         return(null_df)
 
-##*******************************************GROUP BY VAR*************************************************##
+##*******************************************GROUP BY VAR*************************************************##    
 def group_by_var(df,var,dv):
     """
     Returns Dataframe with Events grouped by input Variable
@@ -250,7 +238,7 @@ def group_by_var(df,var,dv):
         check = pd.concat([null_handler(df,mod_var,dv),test],axis=0)
         check.reset_index(drop=True,inplace=True)
         return(check)
-
+    
     ##CATEGORY NAMES FOR EVERYTHING ELSE
     else:
         test = df[~df[var].isnull()].groupby([var]).agg({dv:['sum','count']}).reset_index()
@@ -261,8 +249,8 @@ def group_by_var(df,var,dv):
         check = pd.concat([null_handler(df,var,dv),test],axis=0)
         check.reset_index(drop=True,inplace=True)
         return(check)
-
-##*******************************************BIVARIATE ANALYSIS******************************************##
+    
+##*******************************************BIVARIATE ANALYSIS******************************************##  
 def bivariate(main,var,dv):
     """
     Returns Bivariate Dataframe with Events grouped by input Variable
@@ -271,7 +259,7 @@ def bivariate(main,var,dv):
        dv  : Dependant Variable
     """
     df = main[[var,dv]].copy()  ##SMALLER COPIES MORE OPTIMAL
-
+    
     ##CHECKING FOR CORRECT DATA TYPES
     if str(df[var].dtype) not in ['object','int16','int32','int64','float16','float32','float64']:
         return(pd.DataFrame()) #RETURNS EMPTY DATAFRAME FOR FULL RUN
@@ -279,7 +267,7 @@ def bivariate(main,var,dv):
         ##CATEGORICAL TREATMENT
         if (str(df[var].dtype)=='object') or (df[var].nunique()<=15) :
             return(group_by_var(df,var,dv))
-
+        
         ## RANDOM RANKING CONTINUOUS TREATMENT
         else:
             try:
@@ -296,27 +284,27 @@ def bivariate(main,var,dv):
                 df.reset_index(drop=True,inplace=True)
                 df['qcut_'+var] = pd.qcut(df[var].rank(method='first'),10,labels=['BIN'+str(i) for i in range(10)])
                 return(group_by_var(df,'qcut_'+var,dv))
-
-
+            
+            
 ##*******************************************INFORMATION VALUE*********************************************##
 def information_value(df,var,dv):
     """Returns Information Value of the Variable whose binning has been performed
        Input Data Frame should include df,var, and dv
     """
-
+    
     var_df=bivariate(df,var,dv)
-
+    
     ##ADJUSTING FOR 0 EVENTS OR NON EVENTS
     var_df['adj_events']     = var_df.apply(lambda x: x['events']+0.5 if (x['events']==0 or x['non_events']==0) else x['events'],axis=1)
     var_df['adj_non_events'] = var_df.apply(lambda x: x['non_events']+0.5 if (x['events']==0 or x['non_events']==0) else x['non_events'],axis=1)
-
+    
     ##USUAL IV CALCULATIONs
     var_df['pct_events']     = var_df['adj_events']    /var_df['adj_events'].sum()
     var_df['pct_non_events'] = var_df['adj_non_events']/var_df['adj_non_events'].sum()
     var_df['log_g_b']        = np.log(var_df['pct_events']/var_df['pct_non_events'])
     var_df['g_b']            = var_df['pct_events']-var_df['pct_non_events']
     var_df['woe']            = var_df['g_b']*var_df['log_g_b']
-
+    
     ##SHOULD RETURN SINGLE VALUE DATAFRAME
     check = {
         'var':[],
@@ -328,5 +316,5 @@ def information_value(df,var,dv):
     check['iv'].append(var_df['woe'].sum())           ##COMPLETE IV
     check['mod_iv'].append(var_df[~var_df['category'].isin(['NULL'])]['woe'].sum()) ##NON NULL VALUE IV
     check['diff']= [x-y for x,y in zip(check['iv'],check['mod_iv'])]
-    final = pd.DataFrame(check,index=[0])
+    final = pd.DataFrame(check,index=[0])    
     return(final[['var','iv','mod_iv','diff']])
