@@ -11,6 +11,20 @@ Check for the classification item
 
 
 """
+##**************************************************************************************************************##
+##  Add Detailed Instructions on how to use the module 
+##  MODULES TO BE ADDED
+##  01: Model Evaluation Metrics and Graphical Results 
+##  ----------------------------------------------------------------------->>>>>02: Bivariate Informative Plotting
+##  03: Gini Index Variable Importance Metric
+##  04: Varclus, PCA, Correlation, VIF (Read Relevant Theory First)
+##  05: Monotonic WOE Interpreter for Logistic Regression
+##  06: Linear Regression Module (Model Evaluation Metrics)
+##  07: Single Variable EDD Plotting (Using Seaborn)
+##  08: Variable Transformation Impact Assessment (Theory + Output Testing)
+##  09: Adding Times (Some sort of Wrapper and Decorator Functions for Enhanced Utility)
+##*************************************************************************************************************##
+
 from __future__ import print_function
 
 import os
@@ -23,7 +37,10 @@ import numpy as np
 import collections
 
 from ipywidgets import IntProgress
-from IPython.display import display
+from IPython.display import display,HTML
+
+import matplotlib.pyplot as plt
+from matplotlib import gridspec #RATIO DIVISION
 
 pd.set_option('display.max_columns',200)
 pd.set_option('display.max_rows',1000)
@@ -35,6 +52,8 @@ warnings.filterwarnings('ignore')
 print("Running on Python 2")
 print("Pandas Set Options Modified")
 
+#get_ipython().run_line_magic("config InlineBackend.figure_format='retina'",'') ##TO ENABLE RETINA DSIPLAY
+
 ##*******************************************UTILITY: PROGRESS BAR************************************##
 def progress_bar(**kwargs):
     """
@@ -45,6 +64,10 @@ def progress_bar(**kwargs):
     
     Second Run --> Recursively Pass Floater to generate value
     ORIGIN=k            : This would pass an already created floater   
+    
+    Function Guide: 
+    check=progress_bar(NULL=(len(run_list)-len(skip_list)))
+    check=progress_bar(ORIGIN=check)
     """
     key = kwargs.items()
     
@@ -69,18 +92,26 @@ def full_data_run(**kwargs):
     e) dv       : Dependant Variable
     
     Usage Example: 
-    full_data_run(run_list   = main.columns,
+    full_data_run(run_list  = main.columns,
                   skip_list = ['BAD'],
                   dframe    = main,
                   func      = bivariate,
                   dv        = 'BAD')
     """
+    
     ##PROPER WAY OF USING KWARGS
     run_list  = kwargs['run_list']
     skip_list = kwargs['skip_list']
     dframe    = kwargs['dframe']
     func      = kwargs['func']
     dv        = kwargs['dv']
+    
+    ##EDD COMPLETE STATUS
+    if func==edd:
+        print_html="""
+        <p style="text-align:right"> Rows : ##1## || Columns : ##2## </p>
+        """.replace('##1##',str(len(dframe))).replace('##2##',str(len(dframe.columns)))
+        display(HTML(print_html))
     
     ##DECLARING EMPTY DATAFRAME
     full_run = pd.DataFrame()
@@ -105,7 +136,6 @@ def edd(df,var,**kwargs):
     """Function to generate a comprehensive EDD for any given variable"""
     
     """Basic Data Indicators"""
-    
     var_data_type   = str(df[var].dtypes)
     min_var_length  = df[var].apply(lambda x: 0 if x!=x else len(str(x))).min()
     max_var_length  = df[var].apply(lambda x: 0 if x!=x else len(str(x))).max()
@@ -265,10 +295,21 @@ def bivariate(main,var,dv):
         return(pd.DataFrame()) #RETURNS EMPTY DATAFRAME FOR FULL RUN
     else:
         ##CATEGORICAL TREATMENT
-        if (str(df[var].dtype)=='object') or (df[var].nunique()<=15) :
+        if (str(df[var].dtype)=='object' and df[var].nunique()<30) or (df[var].nunique()<=15):
             return(group_by_var(df,var,dv))
         
-        ## RANDOM RANKING CONTINUOUS TREATMENT
+        elif (str(df[var].dtype)=='object' and df[var].nunique()>=30):
+            large_string_vars = {
+                'variable'  :var,
+                'category'  :'gt_30_categories',
+                'nobs'      :df[var].count(),
+                'events'    :df[dv].sum(),
+                'non_events':df[var].count()-df[dv].sum()
+            }
+            ret_df = pd.DataFrame(large_string_vars,index=[0]) 
+            return(ret_df[['variable','category','nobs','events','non_events']]) 
+        
+        ## RANDOM RANKING CONTINUOUS TREATMENT FOR NUMERIC VARIABLES
         else:
             try:
                 df['qcut_'+var]=pd.qcut(df[var],10,labels=['BIN'+str(i) for i in range(10)])
@@ -290,13 +331,25 @@ def bivariate(main,var,dv):
 def information_value(df,var,dv):
     """Returns Information Value of the Variable whose binning has been performed
        Input Data Frame should include df,var, and dv
+    
     """
     
     var_df=bivariate(df,var,dv)
     
+    
+    if var_df['category'].loc[0]=='gt_30_categories':
+        return(pd.DataFrame())
+    
+    def niv(a,b):
+        if a==0 or b==0:
+            return(1)
+        else:
+            return(0)
+    
+    
     ##ADJUSTING FOR 0 EVENTS OR NON EVENTS
-    var_df['adj_events']     = var_df.apply(lambda x: x['events']+0.5 if (x['events']==0 or x['non_events']==0) else x['events'],axis=1)
-    var_df['adj_non_events'] = var_df.apply(lambda x: x['non_events']+0.5 if (x['events']==0 or x['non_events']==0) else x['non_events'],axis=1)
+    var_df['adj_events']     = var_df.apply(lambda x: x['events']+0.5 if niv(x['events'],x['non_events'])==1 else x['events'],axis=1)
+    var_df['adj_non_events'] = var_df.apply(lambda x: x['non_events']+0.5 if niv(x['events'],x['non_events'])==1 else x['non_events'],axis=1)
     
     ##USUAL IV CALCULATIONs
     var_df['pct_events']     = var_df['adj_events']    /var_df['adj_events'].sum()
@@ -318,3 +371,76 @@ def information_value(df,var,dv):
     check['diff']= [x-y for x,y in zip(check['iv'],check['mod_iv'])]
     final = pd.DataFrame(check,index=[0])    
     return(final[['var','iv','mod_iv','diff']])
+
+
+##*******************************************INFORMATION VALUE*************************************************##
+def bivariate_plot(main,var,dv):
+    
+    check = bivariate(main,var,dv)
+    
+    ##CREATING ADDITIONAL VARIABLES
+    check['dr']      = check['events']/check['nobs']*100
+    check['bin_ind'] = check['category'].apply(lambda x: 1 if ('BIN' in str(x))&('[' in str(x)) else 0)
+    binned =1 if check['bin_ind'].sum()>0 else 0 
+
+    ##SORTING DATAFRAME
+    if binned==1:
+        check=check.sort_values(by=['category'],ascending=True).reset_index(drop=True)
+    else:
+        check=check.sort_values(by=['nobs'],ascending=False).reset_index(drop=True)
+
+    ##CREATING X1 X2 LABELS
+    check['x1_labels'] = check['category'].apply(lambda x: x.split('_')[0] if  binned==1  else x )
+    check['x2_labels'] = check['category'].apply(lambda x: x.split('_')[1] if (binned==1 and 'NULL' not in x) else '')
+    
+    width = 0.6
+
+    fig = plt.figure(figsize=(15,5)) #DEFINING FIGURE
+    gs  = gridspec.GridSpec(1, 2, width_ratios=[2, 1]) # 1,2 FORMATION WITH 3:1 WIDTH RATIO
+    ax1 = plt.subplot(gs[0]) #FIRST AXIS
+    ax2 = ax1.twinx() #COMBO CHART DUAL AXIS
+    ax3 = plt.subplot(gs[1]) #SECOND AXIS FOR TABLE
+
+
+    check.plot(kind='bar' ,x='x1_labels',y='nobs',rot=0,color='lightblue',width=width,ax=ax1)
+    check.plot(kind='line',x='x1_labels',y='dr'  ,rot=0,color='red',ax=ax2)
+
+    x_range = list(np.arange(len(check)))
+    y_range = check['dr'].tolist()
+    for x,y in zip(x_range,y_range):
+        label = "{:.1f}%".format(y)
+        ax2.annotate(label, # this is the text
+                     (x,y), # this is the point to label
+                     textcoords="offset points", # how to position the text
+                     xytext=(0,0), # distance from text to points (x,y)
+                     ha='center',
+                     verticalalignment='bottom',
+                     size=12) # horizontal alignment can be left, right or center
+
+    ax1.set_title("Bivariate For {}".format(check['variable'].loc[0]),fontsize=15)
+    ax1.set_xlim([-width, len(check['variable'])-width*2/3])
+    ax1.set_ylim([0 ,int(check['nobs'].max()*1.05)])
+    ax2.set_ylim([0 ,int(check['dr'].max()*1.15)])
+    ax1.xaxis.set_label_text("")
+    ax1.tick_params(axis='x',labelsize=10)
+    ax1.get_legend().remove()
+    ax2.get_legend().remove()
+    ax1.xaxis.set_tick_params(labelsize=12)
+    ax1.yaxis.set_tick_params(labelsize=12)
+    ax2.yaxis.set_tick_params(labelsize=12)
+
+    crow = check[['x1_labels','x2_labels']]    
+
+    ax3.set_title("Group Split for {}".format(check['variable'].loc[0]),fontsize=15)
+    table = ax3.table(
+             cellText=crow.values, 
+             colLabels=crow.columns, 
+             loc='center',
+             colWidths=[2,2]
+            )
+    ax3.set_xticks([])
+    ax3.set_yticks([])
+    table.auto_set_column_width((-1, 0, 1, 2, 3))
+    table.set_fontsize(12)
+    table.scale(1.7, 1.7)
+    plt.show()
