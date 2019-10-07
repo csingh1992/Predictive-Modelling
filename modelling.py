@@ -14,13 +14,14 @@ Check for the classification item
 ##**************************************************************************************************************##
 ##  Add Detailed Instructions on how to use the module 
 ##  MODULES TO BE ADDED
+##  00: EDD Variable Selection
 ##  01: Model Evaluation Metrics and Graphical Results 
 ##  ----------------------------------------------------------------------->>>>>02: Bivariate Informative Plotting
-##  03: Gini Index Variable Importance Metric
+##  03: Gini Index Variable Importance Metric----->>>> (3)
 ##  04: Varclus, PCA, Correlation, VIF (Read Relevant Theory First)
 ##  05: Monotonic WOE Interpreter for Logistic Regression
-##  06: Linear Regression Module (Model Evaluation Metrics)
-##  07: Single Variable EDD Plotting (Using Seaborn)
+##  06: Linear Regression Module (Model Evaluation Metrics)----->>>>> (1)
+##  07: Single Variable EDD Plotting (Using Seaborn)---->>>>> (2)
 ##  08: Variable Transformation Impact Assessment (Theory + Output Testing)
 ##  09: Adding Times (Some sort of Wrapper and Decorator Functions for Enhanced Utility)
 ##*************************************************************************************************************##
@@ -373,8 +374,30 @@ def information_value(df,var,dv):
     return(final[['var','iv','mod_iv','diff']])
 
 
-##*******************************************INFORMATION VALUE*************************************************##
-def bivariate_plot(main,var,dv):
+##*******************************************BIVARIATE PLOTTING*************************************************##
+def bivariate_plot(**kwargs):
+    """
+    Usage Guide: How to use Bivariate Plot
+    
+    bivariate_plot( dframe =  main,
+                    var    =  <Variable Name>
+                    dv     =  <Dependant Variable>
+                    sort   =  <'event_rate'    :Sorted by Event Rate, 
+                                      'obs'    :Sorted by Number
+                                      'default':Sort by default>)
+    ## USAGE EXAMPLE
+    bivariate_plot(dframe=main,
+               var='JOB',
+               dv='BAD',
+               sort='event_rate')
+    """
+    
+    main =kwargs['dframe']
+    var  =kwargs['var']
+    dv   =kwargs['dv']
+    sort =kwargs['sort']   
+    
+    sort_var = 'dr' if sort=='event_rate' else 'nobs'
     
     check = bivariate(main,var,dv)
     
@@ -387,7 +410,7 @@ def bivariate_plot(main,var,dv):
     if binned==1:
         check=check.sort_values(by=['category'],ascending=True).reset_index(drop=True)
     else:
-        check=check.sort_values(by=['nobs'],ascending=False).reset_index(drop=True)
+        check=check.sort_values(by=[sort_var],ascending=False).reset_index(drop=True)
 
     ##CREATING X1 X2 LABELS
     check['x1_labels'] = check['category'].apply(lambda x: x.split('_')[0] if  binned==1  else x )
@@ -429,14 +452,14 @@ def bivariate_plot(main,var,dv):
     ax1.yaxis.set_tick_params(labelsize=12)
     ax2.yaxis.set_tick_params(labelsize=12)
 
-    crow = check[['x1_labels','x2_labels']]    
+    crow = check[['x1_labels','x2_labels','nobs']]    
 
     ax3.set_title("Group Split for {}".format(check['variable'].loc[0]),fontsize=15)
     table = ax3.table(
              cellText=crow.values, 
              colLabels=crow.columns, 
              loc='center',
-             colWidths=[2,2]
+             colWidths=[2,2,2]  ##THIS NEEDS TO BE CHANGED WHENEVER YOU ADD MORE COLUMNS FOR DISPLAY
             )
     ax3.set_xticks([])
     ax3.set_yticks([])
