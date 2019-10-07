@@ -36,12 +36,13 @@ import warnings
 import pandas as pd
 import numpy as np
 import collections
+import base64
+from io import BytesIO
 
 from ipywidgets import IntProgress
 from IPython.display import display,HTML
 
 import matplotlib.pyplot as plt
-from matplotlib import gridspec #RATIO DIVISION
 
 pd.set_option('display.max_columns',200)
 pd.set_option('display.max_rows',1000)
@@ -50,10 +51,14 @@ pd.options.display.float_format = '{:,.2f}'.format  ##IMPROVING DISPLAY OPTIONS
 
 warnings.filterwarnings('ignore')
 
+plt.ioff() ##STOPPING FROM INTERACTIVE PRINTING
+
 print("Running on Python 2")
 print("Pandas Set Options Modified")
 
 #get_ipython().run_line_magic("config InlineBackend.figure_format='retina'",'') ##TO ENABLE RETINA DSIPLAY
+#xes.axhline(self, y=0, xmin=0, xmax=1, **kwargs)[source]
+
 
 ##*******************************************UTILITY: PROGRESS BAR************************************##
 def progress_bar(**kwargs):
@@ -70,16 +75,16 @@ def progress_bar(**kwargs):
     check=progress_bar(NULL=(len(run_list)-len(skip_list)))
     check=progress_bar(ORIGIN=check)
     """
-    key = kwargs.items()
+    [(key,value)] = kwargs.items() ##CHANGE AS SUGGESTED BY VIBHU IMPROVES DICT ERROR OF KWARGS
     
-    if key[0][0]=='NULL':
-        f = IntProgress(min=0,max=key[0][1]) 
+    if key=='NULL':
+        f = IntProgress(min=0,max=value) 
         f.value=0
         #f.description='Completed '+str(f.value)+'%'
         display(f)
         return(f)
     else:
-        f=key[0][1] #FLOATER OBJECT
+        f=value #FLOATER OBJECT
         f.value+=1  #INCREMENT VALUE BY ONE
         f.description=str(int(float(f.value)/float(f.max)*100))+'% Done'
         return(f)
@@ -397,10 +402,12 @@ def bivariate_plot(**kwargs):
     dv   =kwargs['dv']
     sort =kwargs['sort']   
     
-    sort_var = 'dr' if sort=='event_rate' else 'nobs'
+    sort_var = 'dr' if sort=='event_rate' else 'nobs' 
     
     check = bivariate(main,var,dv)
     
+    event_rate = float(check['events'].sum())/float(check['nobs'].sum())*100
+
     ##CREATING ADDITIONAL VARIABLES
     check['dr']      = check['events']/check['nobs']*100
     check['bin_ind'] = check['category'].apply(lambda x: 1 if ('BIN' in str(x))&('[' in str(x)) else 0)
@@ -415,14 +422,13 @@ def bivariate_plot(**kwargs):
     ##CREATING X1 X2 LABELS
     check['x1_labels'] = check['category'].apply(lambda x: x.split('_')[0] if  binned==1  else x )
     check['x2_labels'] = check['category'].apply(lambda x: x.split('_')[1] if (binned==1 and 'NULL' not in x) else '')
-    
+
     width = 0.6
 
-    fig = plt.figure(figsize=(15,5)) #DEFINING FIGURE
-    gs  = gridspec.GridSpec(1, 2, width_ratios=[2, 1]) # 1,2 FORMATION WITH 3:1 WIDTH RATIO
-    ax1 = plt.subplot(gs[0]) #FIRST AXIS
+    fig = plt.figure(figsize=(9,5)) #DEFINING FIGURE
+    ax1 = fig.add_subplot(1,1,1) #FIRST AXIS
     ax2 = ax1.twinx() #COMBO CHART DUAL AXIS
-    ax3 = plt.subplot(gs[1]) #SECOND AXIS FOR TABLE
+    #ax3 = plt.subplot(gs[1]) #SECOND AXIS FOR TABLE
 
 
     check.plot(kind='bar' ,x='x1_labels',y='nobs',rot=0,color='lightblue',width=width,ax=ax1)
@@ -451,19 +457,41 @@ def bivariate_plot(**kwargs):
     ax1.xaxis.set_tick_params(labelsize=12)
     ax1.yaxis.set_tick_params(labelsize=12)
     ax2.yaxis.set_tick_params(labelsize=12)
+    
+    one  = ax1.get_legend_handles_labels()
+    two  = ax2.get_legend_handles_labels()
+        
+    ax1.legend(one,two, loc='upper center', bbox_to_anchor=(0.5, -0.05),
+          fancybox=True, shadow=True, ncol=5)
+    
+    ax2.axhline(y=event_rate,color='black',linestyle='--')
+    
+    tmpfile = BytesIO()
+    fig.savefig(tmpfile,format='png',bbox_inches='tight',pad_inches=0.5) ##REMOVES WHITESPACE
+    plt.close(fig) ##PREVENT FROM DISPLAYING IMAGE
+    encoded = base64.b64encode(tmpfile.getvalue())
 
-    crow = check[['x1_labels','x2_labels','nobs']]    
-
-    ax3.set_title("Group Split for {}".format(check['variable'].loc[0]),fontsize=15)
-    table = ax3.table(
-             cellText=crow.values, 
-             colLabels=crow.columns, 
-             loc='center',
-             colWidths=[2,2,2]  ##THIS NEEDS TO BE CHANGED WHENEVER YOU ADD MORE COLUMNS FOR DISPLAY
-            )
-    ax3.set_xticks([])
-    ax3.set_yticks([])
-    table.auto_set_column_width((-1, 0, 1, 2, 3))
-    table.set_fontsize(12)
-    table.scale(1.7, 1.7)
-    plt.show()
+    crow = check[['x1_labels','x2_labels','nobs']]
+    crow['%obs'] = check['nobs']/check['nobs'].sum()*100
+    crow.index=['']*len(crow)
+    test_html=("""
+    <style>
+    .aligncenter {
+        text-align: center;
+    }
+    </style>
+    <div class="row">
+      <div class="column">
+    """+"""
+    <p class="aligncenter">
+    <img src=\'data:image/png;base64,{}\' align="left" border="0">
+    </p>
+    """.format(encoded)+
+    """
+    </div>
+    <div class="column"><center><h4> Bins/Groups for {}</h4></center>
+    """.format(var)+"<center>"+crow.to_html()+"</center>"+
+    """
+    </div></div>
+    """)
+    display(HTML(test_html))
