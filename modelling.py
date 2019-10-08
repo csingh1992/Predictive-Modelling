@@ -15,15 +15,12 @@ Check for the classification item
 ##  Add Detailed Instructions on how to use the module 
 ##  MODULES TO BE ADDED
 ##  00: EDD Variable Selection
-##  01: Model Evaluation Metrics and Graphical Results 
-##  ----------------------------------------------------------------------->>>>>02: Bivariate Informative Plotting
 ##  03: Gini Index Variable Importance Metric----->>>> (3)
 ##  04: Varclus, PCA, Correlation, VIF (Read Relevant Theory First)
 ##  05: Monotonic WOE Interpreter for Logistic Regression
 ##  06: Linear Regression Module (Model Evaluation Metrics)----->>>>> (1)
 ##  07: Single Variable EDD Plotting (Using Seaborn)---->>>>> (2)
 ##  08: Variable Transformation Impact Assessment (Theory + Output Testing)
-##  09: Adding Times (Some sort of Wrapper and Decorator Functions for Enhanced Utility)
 ##*************************************************************************************************************##
 
 from __future__ import print_function
@@ -38,6 +35,11 @@ import numpy as np
 import collections
 import base64
 from io import BytesIO
+
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import auc,roc_auc_score,roc_curve,precision_recall_curve
 
 from ipywidgets import IntProgress
 from IPython.display import display,HTML
@@ -91,18 +93,25 @@ def progress_bar(**kwargs):
 
 def full_data_run(**kwargs):
     """
-    a) run_list : List of columns on which function needs to be mapped
-    b) skip_list: List of columns on which function needs to be skipped
-    c) dframe   : Name of DataFrame
-    d) func     : Name of the function to be scaled
-    e) dv       : Dependant Variable
+    FUNCTION: This would return a Full Run of the Function on Run List - Skip List
     
-    Usage Example: 
-    full_data_run(run_list  = main.columns,
-                  skip_list = ['BAD'],
-                  dframe    = main,
-                  func      = bivariate,
-                  dv        = 'BAD')
+    USAGE GUIDE: 
+    edd(
+        *run_list  = <LIST OF VARIABLES ON WHICH FUNCTION NEEDS TO BE SCALED>
+        *skip_list = <LIST OF VARIABLES ON WHICH FUNCTION NEEDS TO BE SKIPPED>
+        *dframe    = <DATAFRAME>,
+        *func      = <FUNCTION NAME WHICH HAS TO BE RUN>
+        **kwargs
+    
+    EXAMPLE: 
+    
+    full_data_run(
+              run_list = df.columns,
+              skip_list= ['Survived','Name'],
+              func     = bivariate_plot,
+              dframe   = df,
+              dv       = 'Survived',
+              sort     = 'default')
     """
     
     ##PROPER WAY OF USING KWARGS
@@ -110,7 +119,7 @@ def full_data_run(**kwargs):
     skip_list = kwargs['skip_list']
     dframe    = kwargs['dframe']
     func      = kwargs['func']
-    dv        = kwargs['dv']
+    
     
     ##EDD COMPLETE STATUS
     if func==edd:
@@ -129,7 +138,7 @@ def full_data_run(**kwargs):
     for var in run_list:
         if var in skip_list:
             continue
-        full_run = pd.concat([full_run,func(dframe,var,dv=dv)],axis=0)
+        full_run = pd.concat([full_run,func(var=var,**kwargs)],axis=0)
         ##KWARGS NEEDS KEY VALUE PAIRS ELSE IT THROWS AN ERROR
         check=progress_bar(ORIGIN=check)
         
@@ -138,8 +147,16 @@ def full_data_run(**kwargs):
 
 
 ##*******************************************EXPLORATORY DATA DICTIONARY************************************##
-def edd(df,var,**kwargs):
-    """Function to generate a comprehensive EDD for any given variable"""
+def edd(**kwargs):
+    """
+    FUNCTION: This would return a Single Row DataFrame with EDD of the Variable
+    
+    USAGE GUIDE: 
+    edd(dframe= <DATAFRAME>,
+        var   = <VARIABLE WHOSE EDD HAS TO BE DONE>)
+    """
+    df  = kwargs['dframe']
+    var = kwargs['var']
     
     """Basic Data Indicators"""
     var_data_type   = str(df[var].dtypes)
@@ -287,13 +304,22 @@ def group_by_var(df,var,dv):
         return(check)
     
 ##*******************************************BIVARIATE ANALYSIS******************************************##  
-def bivariate(main,var,dv):
+def bivariate(**kwargs):
     """
-    Returns Bivariate Dataframe with Events grouped by input Variable
-       df  : Input Dataframe
-       var : Variable to be Grouped
-       dv  : Dependant Variable
+    FUNCTION: This would return a Dataframe of Bivariate Analysis of a Variable with Dependant Variable
+    
+    USAGE GUIDE: 
+    bivariate(dframe= <DATAFRAME>,
+              var   = <VARIABLE WHOSE BIVARIATE HAS TO BE DONE>,
+              dv    = <DEPENDANT VARIABLE>)
     """
+    
+    
+    main = kwargs['dframe']
+    var  = kwargs['var']
+    dv   = kwargs['dv']
+    
+    
     df = main[[var,dv]].copy()  ##SMALLER COPIES MORE OPTIMAL
     
     ##CHECKING FOR CORRECT DATA TYPES
@@ -301,10 +327,10 @@ def bivariate(main,var,dv):
         return(pd.DataFrame()) #RETURNS EMPTY DATAFRAME FOR FULL RUN
     else:
         ##CATEGORICAL TREATMENT
-        if (str(df[var].dtype)=='object' and df[var].nunique()<30) or (df[var].nunique()<=15):
+        if (str(df[var].dtype)=='object' and df[var].nunique()<20) or (df[var].nunique()<=15):
             return(group_by_var(df,var,dv))
         
-        elif (str(df[var].dtype)=='object' and df[var].nunique()>=30):
+        elif (str(df[var].dtype)=='object' and df[var].nunique()>=20):
             large_string_vars = {
                 'variable'  :var,
                 'category'  :'gt_30_categories',
@@ -334,67 +360,75 @@ def bivariate(main,var,dv):
             
             
 ##*******************************************INFORMATION VALUE*********************************************##
-def information_value(df,var,dv):
-    """Returns Information Value of the Variable whose binning has been performed
-       Input Data Frame should include df,var, and dv
-    
+def information_value(**kwargs):
     """
+    FUNCTION: This would return a Information Value of a variable with Dependant Variable
     
-    var_df=bivariate(df,var,dv)
-    
-    
-    if var_df['category'].loc[0]=='gt_30_categories':
+    USAGE GUIDE: 
+    information_value(dframe= <DATAFRAME>,
+              var   = <VARIABLE WHOSE IV HAS TO BE CREATED>,
+              dv    = <DEPENDANT VARIABLE>)
+    """
+    df = kwargs['dframe']
+    var= kwargs['var']
+    dv = kwargs['dv']
+
+    check=bivariate(dframe=df,
+                     var=var,
+                     dv=dv)
+
+    without_null = check[~check['category'].isin(['NULL'])]
+
+    if check['category'].loc[0]=='gt_30_categories':
         return(pd.DataFrame())
-    
+
     def niv(a,b):
         if a==0 or b==0:
             return(1)
         else:
             return(0)
-    
-    
-    ##ADJUSTING FOR 0 EVENTS OR NON EVENTS
-    var_df['adj_events']     = var_df.apply(lambda x: x['events']+0.5 if niv(x['events'],x['non_events'])==1 else x['events'],axis=1)
-    var_df['adj_non_events'] = var_df.apply(lambda x: x['non_events']+0.5 if niv(x['events'],x['non_events'])==1 else x['non_events'],axis=1)
-    
-    ##USUAL IV CALCULATIONs
-    var_df['pct_events']     = var_df['adj_events']    /var_df['adj_events'].sum()
-    var_df['pct_non_events'] = var_df['adj_non_events']/var_df['adj_non_events'].sum()
-    var_df['log_g_b']        = np.log(var_df['pct_events']/var_df['pct_non_events'])
-    var_df['g_b']            = var_df['pct_events']-var_df['pct_non_events']
-    var_df['woe']            = var_df['g_b']*var_df['log_g_b']
-    
+
+    def inner_woe(var_df):
+        
+        ##ADJUSTING FOR 0 EVENTS OR NON EVENTS
+        var_df['adj_events']     = var_df.apply(lambda x: x['events']+0.5 if niv(x['events'],x['non_events'])==1 else x['events'],axis=1)
+        var_df['adj_non_events'] = var_df.apply(lambda x: x['non_events']+0.5 if niv(x['events'],x['non_events'])==1 else x['non_events'],axis=1)
+
+        ##USUAL IV CALCULATIONs
+        var_df['pct_events']     = var_df['adj_events']    /var_df['adj_events'].sum()
+        var_df['pct_non_events'] = var_df['adj_non_events']/var_df['adj_non_events'].sum()
+        var_df['log_g_b']        = np.log(var_df['pct_events']/var_df['pct_non_events'])
+        var_df['g_b']            = var_df['pct_events']-var_df['pct_non_events']
+        var_df['woe']            = var_df['g_b']*var_df['log_g_b']
+
+        return(var_df['woe'].sum())
+
     ##SHOULD RETURN SINGLE VALUE DATAFRAME
-    check = {
+    check1 = {
         'var':[],
         'iv':[],
         'mod_iv':[],
         'diff':[]
     }
-    check['var'].append(var_df['variable'].loc[0]) ##SINGLE VALUE LOC SELECTION
-    check['iv'].append(var_df['woe'].sum())           ##COMPLETE IV
-    check['mod_iv'].append(var_df[~var_df['category'].isin(['NULL'])]['woe'].sum()) ##NON NULL VALUE IV
-    check['diff']= [x-y for x,y in zip(check['iv'],check['mod_iv'])]
-    final = pd.DataFrame(check,index=[0])    
+    check1['var'].append(check['variable'].loc[0])    ##SINGLE VALUE LOC SELECTION
+    check1['iv'].append(inner_woe(check))           ##COMPLETE IV
+    check1['mod_iv'].append(inner_woe(without_null)) ##NON NULL VALUE IV
+    check1['diff']= [x-y for x,y in zip(check1['iv'],check1['mod_iv'])]
+    final = pd.DataFrame(check1,index=[0])    
     return(final[['var','iv','mod_iv','diff']])
 
 
 ##*******************************************BIVARIATE PLOTTING*************************************************##
 def bivariate_plot(**kwargs):
     """
-    Usage Guide: How to use Bivariate Plot
+    FUNCTION: This would return a Bivariate Plot with Event Rate and Observation Count
     
-    bivariate_plot( dframe =  main,
-                    var    =  <Variable Name>
-                    dv     =  <Dependant Variable>
-                    sort   =  <'event_rate'    :Sorted by Event Rate, 
-                                      'obs'    :Sorted by Number
-                                      'default':Sort by default>)
-    ## USAGE EXAMPLE
-    bivariate_plot(dframe=main,
-               var='JOB',
-               dv='BAD',
-               sort='event_rate')
+    USAGE GUIDE: 
+    bivariate_plot(dframe= <DATAFRAME>,
+                   var   = <VARIABLE WHOSE BIVARIATE PLOT HAS TO BE MADE>,
+                   dv    = <DEPENDANT VARIABLE>,
+                   sort  = < "default":Normal Order, "event_rate": (NON-ORDINAL ONLY) Sorted by Event Rate, 
+                           "nobs":Sorted by Count (NON-ORDINAL ONLY)>)
     """
     
     main =kwargs['dframe']
@@ -402,72 +436,73 @@ def bivariate_plot(**kwargs):
     dv   =kwargs['dv']
     sort =kwargs['sort']   
     
-    sort_var = 'dr' if sort=='event_rate' else 'nobs' 
+    check=bivariate(dframe=main,
+                       var=var,
+                        dv=dv)
     
-    check = bivariate(main,var,dv)
-    
+    #ADDITIONAL PROCESSING
+    sort_var   = 'dr' if sort=='event_rate' else 'nobs'
     event_rate = float(check['events'].sum())/float(check['nobs'].sum())*100
 
-    ##CREATING ADDITIONAL VARIABLES
     check['dr']      = check['events']/check['nobs']*100
     check['bin_ind'] = check['category'].apply(lambda x: 1 if ('BIN' in str(x))&('[' in str(x)) else 0)
     binned =1 if check['bin_ind'].sum()>0 else 0 
 
-    ##SORTING DATAFRAME
     if binned==1:
         check=check.sort_values(by=['category'],ascending=True).reset_index(drop=True)
     else:
         check=check.sort_values(by=[sort_var],ascending=False).reset_index(drop=True)
 
-    ##CREATING X1 X2 LABELS
     check['x1_labels'] = check['category'].apply(lambda x: x.split('_')[0] if  binned==1  else x )
     check['x2_labels'] = check['category'].apply(lambda x: x.split('_')[1] if (binned==1 and 'NULL' not in x) else '')
 
-    width = 0.6
+    ##PLOT DEFINITIONS
+    bar_width = 0.5
 
-    fig = plt.figure(figsize=(9,5)) #DEFINING FIGURE
-    ax1 = fig.add_subplot(1,1,1) #FIRST AXIS
-    ax2 = ax1.twinx() #COMBO CHART DUAL AXIS
-    #ax3 = plt.subplot(gs[1]) #SECOND AXIS FOR TABLE
+    fig = plt.figure(figsize=(10,6)) 
+    ax1 = fig.add_subplot(111) 
+    ax2 = ax1.twinx() 
 
+    x_vector = np.arange(len(check))+1
+    y_obs    = check['nobs'].tolist()
+    y_dr     = check['dr'].tolist()
+    x_labels = check['x1_labels'].tolist()
 
-    check.plot(kind='bar' ,x='x1_labels',y='nobs',rot=0,color='lightblue',width=width,ax=ax1)
-    check.plot(kind='line',x='x1_labels',y='dr'  ,rot=0,color='red',ax=ax2)
+    ##RAW PLOTS
+    ax1.bar(x_vector,y_obs,align='center',color='lightblue',width=bar_width) #NOBS
+    ax2.plot(x_vector,y_dr,color='red')                                      #EVENT RATE
+    ax2.axhline(y=event_rate,color='black',linestyle='--')                   #AVERAGE EVENT RATE LINE
 
-    x_range = list(np.arange(len(check)))
+    x_range = x_vector                                                       #LABELS
     y_range = check['dr'].tolist()
     for x,y in zip(x_range,y_range):
         label = "{:.1f}%".format(y)
         ax2.annotate(label, # this is the text
                      (x,y), # this is the point to label
                      textcoords="offset points", # how to position the text
-                     xytext=(0,0), # distance from text to points (x,y)
+                     xytext=(2,2), # distance from text to points (x,y)
                      ha='center',
                      verticalalignment='bottom',
                      size=12) # horizontal alignment can be left, right or center
 
+
+    ### BEAUTIFICATION OF GRAPH 
     ax1.set_title("Bivariate For {}".format(check['variable'].loc[0]),fontsize=15)
-    ax1.set_xlim([-width, len(check['variable'])-width*2/3])
-    ax1.set_ylim([0 ,int(check['nobs'].max()*1.05)])
-    ax2.set_ylim([0 ,int(check['dr'].max()*1.15)])
-    ax1.xaxis.set_label_text("")
-    ax1.tick_params(axis='x',labelsize=10)
-    ax1.get_legend().remove()
-    ax2.get_legend().remove()
+    ax1.xaxis.set_ticks(x_vector)
+    ax1.xaxis.set_ticklabels(x_labels)
     ax1.xaxis.set_tick_params(labelsize=12)
     ax1.yaxis.set_tick_params(labelsize=12)
     ax2.yaxis.set_tick_params(labelsize=12)
-    
-    one  = ax1.get_legend_handles_labels()
-    two  = ax2.get_legend_handles_labels()
-        
-    ax1.legend(one,two, loc='upper center', bbox_to_anchor=(0.5, -0.05),
-          fancybox=True, shadow=True, ncol=5)
-    
-    ax2.axhline(y=event_rate,color='black',linestyle='--')
-    
+    ax1.set_ylim([0 ,int(check['nobs'].max()*1.05)])
+    ax2.set_ylim([0 ,int(check['dr'].max()*1.3)])
+    #ax1.get_legend().remove()
+    #ax2.get_legend().remove()
+    ax1.xaxis.set_label_text("")
+
+
+    ##DISPLAYING WITH DATAFRAME
     tmpfile = BytesIO()
-    fig.savefig(tmpfile,format='png',bbox_inches='tight',pad_inches=0.5) ##REMOVES WHITESPACE
+    fig.savefig(tmpfile,format='png',bbox_inches='tight',pad_inches=0.2) ##REMOVES WHITESPACE
     plt.close(fig) ##PREVENT FROM DISPLAYING IMAGE
     encoded = base64.b64encode(tmpfile.getvalue())
 
@@ -495,3 +530,97 @@ def bivariate_plot(**kwargs):
     </div></div>
     """)
     display(HTML(test_html))
+    
+def KS_metric(y_actual,y_predicted):
+    """
+    FUNCTION: This would return a Dataframe with Binned Prediction Column, Events, Non Events etc. 
+    
+    USAGE GUIDE: 
+    KS_metric     (y_actual     = <LIST OF ACTUAL VALUES>,
+                   y_predicted  = <LIST OF PREDICTIONS>)
+    """
+    y = pd.DataFrame({'Actual':y_actual,'pred':y_predicted})
+    y['lift_bins'] = pd.qcut(y['pred'],20,labels=[i for i in np.arange(20)])
+    temp = y.groupby(['lift_bins']).agg({'Actual':['count','sum'],'pred':['min','max']}).reset_index()
+    temp.columns=['lift_bins','p_min','p_max','total','events']
+    temp.sort_values(by=['lift_bins'],ascending=False,inplace=True)
+    temp.reset_index(drop=True,inplace=True)
+    temp['bins'] = temp['lift_bins'].apply(lambda x: str(20-int(x)))
+    temp['Non_Events'] = temp['total']-temp['events']
+    temp['Cum_Events'] = temp['events'].cumsum()
+    temp['Cum_Non_Events'] = temp['Non_Events'].cumsum()
+    temp['Perct_Cum_Events']    =(temp['Cum_Events']/temp['Cum_Events'].max())*100
+    temp['Perct_Cum_Non_Events']=(temp['Cum_Non_Events']/temp['Cum_Non_Events'].max())*100
+    temp.drop(['lift_bins'],axis=1,inplace=True)
+    temp['KS_Diff'] = temp['Perct_Cum_Events']-temp['Perct_Cum_Non_Events']
+    temp['avg_prob'] = (temp['p_min']+temp['p_max'])/2
+    KS = temp['KS_Diff'].max()
+    #print(KS)
+    return(temp)
+
+def eval_metrics(y_actual,**kwargs):
+    """
+    FUNCTION: This would detailed graphical statistics of plots, metrics for evaluating a classification model 
+    
+    USAGE GUIDE: 
+    eval_metrics(y_actual     = <LIST OF ACTUAL VALUES>,
+                   <MODEL_NAME> = <LIST OF PREDICTED VALUE>)
+    
+    SAMPLE EXAMPLE: 
+    
+    eval_metrics(y_test,GBM=y_pred,XGB=y_pred)
+    
+    """
+    count = len(kwargs)
+    colors = ['blue','red','green','yellow']
+    datastore=pd.DataFrame(index=range(count),columns=['MODEL NAME','AUC','GINI','KS STAT'])
+    #ROC Curve and Precision Recall Curve
+    i=0
+    fig = plt.figure(figsize=(15,5))
+    ax1 = fig.add_subplot(1,3,1)
+    ax2 = fig.add_subplot(1,3,2)
+    ax3 = fig.add_subplot(1,3,3)
+    
+    for key,value in kwargs.items():
+        #print key,value
+        datastore['MODEL NAME'][i]=key
+        valuetemp=value.copy()
+        #print("AUROC For ",key,"=",roc_auc_score(y_actual,value))
+        datastore['AUC'][i]  =roc_auc_score(y_actual,value)
+        datastore['GINI'][i] =2*datastore['AUC'][i]-1
+        fpr,tpr,thresh = roc_curve(y_actual,value)
+        ax1.plot(fpr,tpr,color=colors[i],label=key)
+        ax1.legend(loc='upper right')
+        ax1.set_title("ROC Curve")
+        precision, recall, thresholds = precision_recall_curve(y_actual,value)
+        ax2.plot(recall,precision,color=colors[i],label=key)
+        ax2.set_xlabel('Recall')
+        ax2.set_ylabel('Precision')
+        ax2.legend(loc='upper right')
+        ax2.set_title('Precision Recall Curve')
+        temp=KS_metric(y_actual,value)
+        datastore['KS STAT'][i] = temp['KS_Diff'].max()
+        ax3.plot(temp['bins'].tolist(),temp['Perct_Cum_Events'].tolist(),color=colors[i],label=key)
+        ax3.legend(loc='upper right')
+        ax3.set_title('Lift Curve')
+        
+        i+=1
+    #x = np.linspace(*ax3.get_xlim())
+    #ax3.plot(x,x)
+    plt.show()
+    
+    #SEPARATION GRAPH
+    i=1
+    fig = plt.figure(figsize=(15,5))
+    fig.suptitle('Separation Graph')
+    for key,value in kwargs.items():
+        y = pd.DataFrame({'Actual':y_actual,key:value})
+        if count == 1 : ax1 = fig.add_subplot(1,1,1)
+        else : ax1 == fig.add_subplot(2,2,i)
+        y[y['Actual']==1][key].plot(kind='hist',bins=30,color='g',alpha=0.45,normed=-True)
+        y[y['Actual']==0][key].plot(kind='hist',bins=30,color='b',alpha=0.45,normed=-True)
+        ax1.set_title(key)
+        i+=1
+    plt.show()
+    datastore.index= ['']*len(datastore)
+    display(HTML("<center>"+datastore.to_html()+"</center>"))
