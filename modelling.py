@@ -624,3 +624,38 @@ def eval_metrics(y_actual,**kwargs):
     plt.show()
     datastore.index= ['']*len(datastore)
     display(HTML("<center>"+datastore.to_html()+"</center>"))
+    
+##*****************ANALYSING THE PRESENCE OF EVENT RATE WITHINT THE NULL BUCKET*****************###
+
+def null_bucket_analysis(**kwargs):
+    
+    main       = kwargs['dframe']
+    var        = kwargs['var']
+    dv         = kwargs['dv']
+    vc         = main[var].value_counts()
+    null_main  = main[main[var].isnull()]
+    
+    ##TESTING FOR DEFAULT RATES
+    if len(null_main)==0:
+        return(pd.DataFrame())
+    else:
+        event_rate  = np.round(float(main[dv].sum())/float(len(main))*100,2)
+        null_rate   = np.round(float(null_main[dv].sum())/float(len(null_main))*100,2)
+        pop_pct     = np.round(float(len(null_main))/float(len(main))*100,2)
+        unq_obs     = main[var].nunique()
+        modal_pct   = np.round(float(vc.head(1).tolist()[0])/float(len(main)-len(null_main))*100,2)
+        modal_value = vc.index[0]
+
+        frame={
+         'variable'       : var,
+         'event_rate'     : event_rate,
+         'null_event_rate': null_rate,
+         'pct_null'       : pop_pct,
+         'distinct'       : unq_obs,
+         'modal_value'    : modal_value,
+         'modal_pct'      : modal_pct
+        }
+        ret_frame = pd.DataFrame(frame,index=[0])
+        ret_frame = ret_frame[['variable','event_rate','null_event_rate',
+                               'pct_null','distinct','modal_value','modal_pct']]
+        return(ret_frame)
