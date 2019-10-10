@@ -96,7 +96,7 @@ def full_data_run(**kwargs):
     FUNCTION: This would return a Full Run of the Function on Run List - Skip List
     
     USAGE GUIDE: 
-    edd(
+    full_data_run(
         *run_list  = <LIST OF VARIABLES ON WHICH FUNCTION NEEDS TO BE SCALED>
         *skip_list = <LIST OF VARIABLES ON WHICH FUNCTION NEEDS TO BE SKIPPED>
         *dframe    = <DATAFRAME>,
@@ -441,7 +441,16 @@ def bivariate_plot(**kwargs):
                         dv=dv)
     
     #ADDITIONAL PROCESSING
-    sort_var   = 'dr' if sort=='event_rate' else 'nobs'
+    if sort=='event_rate':
+        sort_var='dr'
+        order=False
+    elif sort=='default':
+        sort_var='category'
+        order=True
+    else:
+        sort_var='nobs'
+        order=False
+        
     event_rate = float(check['events'].sum())/float(check['nobs'].sum())*100
 
     check['dr']      = check['events']/check['nobs']*100
@@ -451,7 +460,7 @@ def bivariate_plot(**kwargs):
     if binned==1:
         check=check.sort_values(by=['category'],ascending=True).reset_index(drop=True)
     else:
-        check=check.sort_values(by=[sort_var],ascending=False).reset_index(drop=True)
+        check=check.sort_values(by=[sort_var],ascending=order).reset_index(drop=True)
 
     check['x1_labels'] = check['category'].apply(lambda x: x.split('_')[0] if  binned==1  else x )
     check['x2_labels'] = check['category'].apply(lambda x: x.split('_')[1] if (binned==1 and 'NULL' not in x) else '')
@@ -558,6 +567,9 @@ def KS_metric(y_actual,y_predicted):
     #print(KS)
     return(temp)
 
+
+##*****************KS METRIC AND EVALUATION METRICS FOR MODELS*****************###
+
 def eval_metrics(y_actual,**kwargs):
     """
     FUNCTION: This would detailed graphical statistics of plots, metrics for evaluating a classification model 
@@ -659,3 +671,72 @@ def null_bucket_analysis(**kwargs):
         ret_frame = ret_frame[['variable','event_rate','null_event_rate',
                                'pct_null','distinct','modal_value','modal_pct']]
         return(ret_frame)
+
+
+#####*******************************************INFORMATION VALUE PLOT*********************************##
+def information_value_plot(**kwargs):
+    """
+    FUNCTION: This would plot the information value of Top 20 Variables (Or Less) as provided within the input 
+    
+    USAGE GUIDE: 
+    information_value_plot(
+        *run_list  = <LIST OF VARIABLES ON WHICH IV PLOT NEEDS TO BE EXECUTED>
+        *skip_list = <LIST OF VARIABLES ON WHICH FUNCTION NEEDS TO BE SKIPPED (Should Include Dependant Variable)>
+        *dframe    = <DATAFRAME>,
+        *dv        = <DEPENDANT VARIABLE>)
+    
+    SAMPLE EXAMPLE: 
+    
+    information_value_plot(
+                           dframe=main,
+                           dv='Survived',
+                           run_list=main.columns,
+                           skip_list=['Survived']
+                           )
+    """
+    ##PROPER WAY OF USING KWARGS
+    run_list  = kwargs['run_list']
+    skip_list = kwargs['skip_list']
+    dframe    = kwargs['dframe']
+    dv        = kwargs['dv']
+    
+    df = full_data_run(dframe=dframe,
+                       run_list=run_list,
+                       skip_list=skip_list,
+                       func=information_value,
+                       dv=dv)
+
+    df.sort_values(by=['iv'],ascending=False,inplace=True)
+    df.reset_index(inplace=True,drop=True)
+    df=df.head(20)
+    fig = plt.figure(figsize=(20,6)) 
+    ax1 = fig.add_subplot(111)
+
+    ax1.axhline(y=0.1,color='red',linestyle='--'   )
+    ax1.axhline(y=0.2,color='orange',linestyle='--')
+    ax1.axhline(y=0.5,color='green',linestyle='--' )
+
+    df.plot(kind='bar',x='var',y='iv',rot=0,ax=ax1,align='center')
+
+    count = len(df) if len(df)<=20 else 20
+    
+    ax1.set_title("Information Value of Top {} Variables".format(str(count)),fontsize=20)
+    ax1.xaxis.set_tick_params(labelsize=12)
+    ax1.yaxis.set_tick_params(labelsize=12)
+    ax1.xaxis.set_label_text("")
+    ax1.axes.get_yaxis().set_ticks([])
+    ax1.get_legend().remove()
+
+    x_range = np.arange(len(df)+1)  #LABELS
+    y_range = df['iv'].tolist()
+
+    for x,y in zip(x_range,y_range):
+            label = "{:.2}".format(y)
+            ax1.annotate(label, # this is the text
+                         (x,y), # this is the point to label
+                         textcoords="offset points", # how to position the text
+                         xytext=(2,2), # distance from text to points (x,y)
+                         ha='center',
+                         verticalalignment='bottom',
+                         size=12) # horizontal alignment can be left, right or center
+    plt.show()
