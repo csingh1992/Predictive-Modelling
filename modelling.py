@@ -233,7 +233,7 @@ def edd(**kwargs):
     frame['modal_pct']    = modal_pct
     frame['min']          = min_value
     frame['max']          = max_value
-    frame['mean']         = max_value
+    frame['mean']         = mean_value
     frame['median']       = median_p50
     frame['top1_p01']     = top1_p01
     frame['top2_p05']     = top2_p05
@@ -530,7 +530,7 @@ def bivariate_plot(**kwargs):
     <p class="aligncenter">
     <img src=\'data:image/png;base64,{}\' align="left" border="0">
     </p>
-    """.format(encoded)+
+    """.format(encoded.decode("utf-8"))+
     """
     </div>
     <div class="column"><center><h4> Bins/Groups for {}</h4></center>
@@ -650,29 +650,85 @@ def null_bucket_analysis(**kwargs):
     ##TESTING FOR DEFAULT RATES
     if len(null_main)==0:
         return(pd.DataFrame())
+    
+    elif str(main[var].dtypes)=='object' and len(vc)>=30:
+        print("String Variable ::{}:: has more than 30 categories, hence skkiped!".format(var)) 
     else:
+        dtype       = str(main[var].dtypes)
+        if dtype in ['int16','int32','int64','float16','float32','float64']:
+            median  = main[var].median()
         event_rate  = np.round(float(main[dv].sum())/float(len(main))*100,2)
         null_rate   = np.round(float(null_main[dv].sum())/float(len(null_main))*100,2)
-        pop_pct     = np.round(float(len(null_main))/float(len(main))*100,2)
-        unq_obs     = main[var].nunique()
+        pct_null    = np.round(float(len(null_main))/float(len(main))*100,2)
+        distinct    = main[var].nunique()
         modal_pct   = np.round(float(vc.head(1).tolist()[0])/float(len(main)-len(null_main))*100,2)
         modal_value = vc.index[0]
-
+        event_rate_diff = abs(event_rate-null_rate)
         frame={
          'variable'       : var,
+         'dtype'          : dtype,
          'event_rate'     : event_rate,
          'null_event_rate': null_rate,
-         'pct_null'       : pop_pct,
-         'distinct'       : unq_obs,
+         'pct_null'       : pct_null,
+         'distinct'       : distinct,
          'modal_value'    : modal_value,
-         'modal_pct'      : modal_pct
+         'modal_pct'      : modal_pct,
+         'event_rate_diff': event_rate_diff
         }
         ret_frame = pd.DataFrame(frame,index=[0])
         ret_frame = ret_frame[['variable','event_rate','null_event_rate',
-                               'pct_null','distinct','modal_value','modal_pct']]
+                               'pct_null','distinct','modal_value','modal_pct','event_rate_diff']]
+        
+        ############ MISSING VALUE/IMPUTATION STRATEGY #######################################
+        
+        if  event_rate_diff>=10 and pct_null>=10 and dtype in ['int16','int32','int64','float16','float32','float64']:
+            impute    = -99
+            strategy  = 'NEW CATEGORY|DIFF>=10&PCT_NULL>10|DTYPE:NUMERIC'
+        elif event_rate_diff>=10 and pct_null>5  and  dtype in ['object']:
+            impute    = "-99"
+            strategy  = 'NEW CATEGORY|DIFF>=10&PCT_NULL>05|DTYPE:OBJECT'
+        elif dtype in ['object']:
+            impute    = modal_value
+            strategy  = 'MODAL VALUE|DIFF<10 OR PCT_NULL<05|DTYPE:OBJECT'
+        elif dtype in ['int16','int32','int64','float16','float32','float64'] and modal_pct>=50:
+            impute    = median
+            strategy  = 'MODAL/MEDIAN|MODAL_PCT>=50|NUMERIC'
+        elif dtype in ['int16','int32','int64','float16','float32','float64'] and  (20<=modal_pct<50):
+            if distinct>=30:
+                impute    = median
+                strategy  = 'MEDIAN|MODAL_PCT~(20,50)|Dist>30|NUMERIC'
+            else:
+                impute    = modal_value
+                strategy  = 'MODE|MODAL_PCT~(20,50)|Dist<30|NUMERIC'
+        elif dtype in ['int16','int32','int64','float16','float32','float64'] and  (0<=modal_pct<20):
+            if distinct>=20:
+                impute    = median
+                strategy  = 'MEDIAN|MODAL_PCT~(00,20)|Dist>20|NUMERIC'
+            else:
+                impute    = modal_value
+                strategy  = 'MODE|MODAL_PCT~(00,50)|Dist<20|NUMERIC'
+            
+        ############ MISSING VALUE/IMPUTATION STRATEGY DATAFRAME RETURN#######################################
+        
+        frame={
+         'variable'       : var,
+         'dtype'          : dtype,
+         'event_rate'     : event_rate,
+         'null_event_rate': null_rate,
+         'pct_null'       : pct_null,
+         'distinct'       : distinct,
+         'modal_value'    : modal_value,
+         'modal_pct'      : modal_pct,
+         'event_rate_diff': event_rate_diff,
+         'impute_value'   : impute,
+         'strategy'       : strategy
+        }
+        ret_frame = pd.DataFrame(frame,index=[0])
+        ret_frame = ret_frame[['variable','event_rate','null_event_rate',
+                               'pct_null','distinct','modal_value','modal_pct','event_rate_diff','impute_value','strategy']]
+        
         return(ret_frame)
-
-
+    
 #####*******************************************INFORMATION VALUE PLOT*********************************##
 def information_value_plot(**kwargs):
     """
