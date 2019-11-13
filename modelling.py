@@ -551,7 +551,12 @@ def KS_metric(y_actual,y_predicted):
     y = pd.DataFrame({'Actual':y_actual,'pred':y_predicted})
     y['lift_bins'] = pd.qcut(y['pred'],20,labels=[i for i in np.arange(20)])
     temp = y.groupby(['lift_bins']).agg({'Actual':['count','sum'],'pred':['min','max']}).reset_index()
-    temp.columns=['lift_bins','p_min','p_max','total','events']
+    temp.columns=temp.columns.droplevel()
+    temp.rename(columns={'':'lift_bins',
+                          'sum':'events',
+                          'count':'total',
+                          'min':'p_min',
+                          'max':'p_max'},inplace=True)
     temp.sort_values(by=['lift_bins'],ascending=False,inplace=True)
     temp.reset_index(drop=True,inplace=True)
     temp['bins'] = temp['lift_bins'].apply(lambda x: str(20-int(x)))
@@ -560,6 +565,8 @@ def KS_metric(y_actual,y_predicted):
     temp['Cum_Non_Events'] = temp['Non_Events'].cumsum()
     temp['Perct_Cum_Events']    =(temp['Cum_Events']/temp['Cum_Events'].max())*100
     temp['Perct_Cum_Non_Events']=(temp['Cum_Non_Events']/temp['Cum_Non_Events'].max())*100
+    temp['Cum_Total']=temp['total'].cumsum()
+    temp['Perct_Cum_Total']=(temp['Cum_Total']/temp['Cum_Total'].max())*100
     temp.drop(['lift_bins'],axis=1,inplace=True)
     temp['KS_Diff'] = temp['Perct_Cum_Events']-temp['Perct_Cum_Non_Events']
     temp['avg_prob'] = (temp['p_min']+temp['p_max'])/2
@@ -586,6 +593,9 @@ def eval_metrics(y_actual,**kwargs):
     count = len(kwargs)
     colors = ['blue','red','green','yellow']
     datastore=pd.DataFrame(index=range(count),columns=['MODEL NAME','AUC','GINI','KS STAT'])
+    
+    
+    
     #ROC Curve and Precision Recall Curve
     i=0
     fig = plt.figure(figsize=(15,5))
@@ -596,44 +606,78 @@ def eval_metrics(y_actual,**kwargs):
     for key,value in kwargs.items():
         #print key,value
         datastore['MODEL NAME'][i]=key
-        valuetemp=value.copy()
+        #valuetemp=value.copy()
         #print("AUROC For ",key,"=",roc_auc_score(y_actual,value))
         datastore['AUC'][i]  =roc_auc_score(y_actual,value)
         datastore['GINI'][i] =2*datastore['AUC'][i]-1
+        
+        ##ROC-AUC CURVE
         fpr,tpr,thresh = roc_curve(y_actual,value)
         ax1.plot(fpr,tpr,color=colors[i],label=key)
         ax1.legend(loc='upper right')
         ax1.set_title("ROC Curve")
+        ax1.set_xlabel('FPR (False Positive Rate)')
+        ax1.set_ylabel('TPR (True Positive Rate)')
+        
+        ##PRECISION AND RECALL CURVE
         precision, recall, thresholds = precision_recall_curve(y_actual,value)
         ax2.plot(recall,precision,color=colors[i],label=key)
         ax2.set_xlabel('Recall')
         ax2.set_ylabel('Precision')
         ax2.legend(loc='upper right')
         ax2.set_title('Precision Recall Curve')
+        
+        ##LIFT CHART
         temp=KS_metric(y_actual,value)
         datastore['KS STAT'][i] = temp['KS_Diff'].max()
-        ax3.plot(temp['bins'].tolist(),temp['Perct_Cum_Events'].tolist(),color=colors[i],label=key)
+        ax3.plot(temp['Perct_Cum_Total'].tolist(),temp['Perct_Cum_Events'].tolist(),color=colors[i],label=key)
         ax3.legend(loc='upper right')
         ax3.set_title('Lift Curve')
-        
+        ax3.set_xlabel('% Total Records')
+        ax3.set_ylabel('% Events')
         i+=1
-    #x = np.linspace(*ax3.get_xlim())
-    #ax3.plot(x,x)
+    plt.show()
+        
+    ##SEPARATION GRAPHs
+    if count in (1,3,4):
+        width_view = 6
+    else:
+        width_view=3 
+    fig = plt.figure(figsize=(15,width_view))
+    fig.suptitle('Separation Graph')
+    if count==1:
+        (key,value) = kwargs.items()[0]
+        y = pd.DataFrame({'Actual':y_actual,key:value})
+        ax1 = fig.add_subplot(1,1,1)
+        y[y['Actual']==1][key].plot(kind='hist',bins=30,color='g',alpha=0.45,normed=True)
+        y[y['Actual']==0][key].plot(kind='hist',bins=30,color='b',alpha=0.45,normed=True)
+        ax1.set_title(key)
+        ax1.set_xlim([0,1])
+    else:    
+        if count==2:
+            ax_arr = fig.subplots(1,2,sharex=True,sharey=True)
+            for i,(key,value) in enumerate(kwargs.items()):
+                y = pd.DataFrame({'Actual':y_actual,key:value})
+                y[y['Actual']==1][key].plot(kind='hist',bins=30,color='g',alpha=0.45,normed=True,ax=ax_arr[i])
+                y[y['Actual']==0][key].plot(kind='hist',bins=30,color='b',alpha=0.45,normed=True,ax=ax_arr[i])
+                ax_arr[i].set_title(key)
+                ax_arr[i].set_xlim([0,1])
+        elif count in (3,4):                
+            ax_arr = fig.subplots(2,2,sharex=True,sharey=True)
+            ax_arr = ax_arr.flatten()
+            for i,(key,value) in enumerate(kwargs.items()):
+                y = pd.DataFrame({'Actual':y_actual,key:value})
+                y[y['Actual']==1][key].plot(kind='hist',bins=30,color='g',alpha=0.45,normed=True,ax=ax_arr[i])
+                y[y['Actual']==0][key].plot(kind='hist',bins=30,color='b',alpha=0.45,normed=True,ax=ax_arr[i])
+                ax_arr[i].set_title(key)
+                ax_arr[i].set_xlim([0,1])
+                if count==3:
+                    ax_arr[3].axis('off')
     plt.show()
     
-    #SEPARATION GRAPH
-    i=1
-    fig = plt.figure(figsize=(15,5))
-    fig.suptitle('Separation Graph')
-    for key,value in kwargs.items():
-        y = pd.DataFrame({'Actual':y_actual,key:value})
-        if count == 1 : ax1 = fig.add_subplot(1,1,1)
-        else : ax1 == fig.add_subplot(2,2,i)
-        y[y['Actual']==1][key].plot(kind='hist',bins=30,color='g',alpha=0.45,normed=-True)
-        y[y['Actual']==0][key].plot(kind='hist',bins=30,color='b',alpha=0.45,normed=-True)
-        ax1.set_title(key)
-        i+=1
-    plt.show()
+    ##SORTED REPORTING METRICS
+    datastore.sort_values(by=['AUC'],ascending=False,inplace=True)
+    #datastore.style.set_properties(**{'text-align':'center'})
     datastore.index= ['']*len(datastore)
     display(HTML("<center>"+datastore.to_html()+"</center>"))
     
